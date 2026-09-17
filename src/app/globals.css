@@ -1,0 +1,79 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-mist font-sans text-ink antialiased;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-violet-500 ring-offset-1;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .control {
+    @apply block w-full rounded-md border border-rule bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:cursor-not-allowed disabled:bg-mist disabled:text-ink-muted;
+  }
+  .control-invalid {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500/20;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft;
+  }
+  .panel {
+    @apply rounded-lg border border-rule bg-white shadow-panel;
+  }
+  /* Section title pill, echoing the purple labels on the paper form */
+  .section-pill {
+    @apply inline-flex items-center gap-2 rounded-r-md bg-violet-700 py-1.5 pl-3 pr-4 text-[13px] font-semibold uppercase tracking-wide text-white;
+  }
+  .data-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .data-table th {
+    @apply border-b border-rule bg-violet-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-violet-800;
+  }
+  .data-table td {
+    @apply border-b border-rule px-3 py-2 align-top;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Browser print fallback (the PRINT REPORT button prints the generated A4 PDF) */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-plain {
+    box-shadow: none !important;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}

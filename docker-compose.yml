@@ -1,0 +1,16 @@
+# Local PostgreSQL for development:  docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gvbl
+      POSTGRES_PASSWORD: gvbl_password
+      POSTGRES_DB: gvbl_lab_ops
+    ports:
+      - "5432:5432"
+    volumes:
+      - gvbl_pgdata:/var/lib/postgresql/data
+
+volumes:
+  gvbl_pgdata:

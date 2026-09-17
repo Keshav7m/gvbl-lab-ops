@@ -1,0 +1,210 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// GVBL NGS Laboratory — Daily Operations Management System
+// Relational schema: one report has many samples, kits/reagents used and
+// consumables received. Every change is recorded in audit_logs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReportStatus {
+  DRAFT
+  COMPLETED
+  VERIFIED
+}
+
+enum InvoiceStatus {
+  UPDATED
+  NONE
+}
+
+enum IssuesStatus {
+  NONE
+  YES
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  VERIFY
+  EXPORT
+  PDF_GENERATED
+}
+
+/// One row per calendar year; lastSeq is incremented atomically to allocate report numbers.
+model ReportCounter {
+  year    Int @id
+  lastSeq Int @default(0) @map("last_seq")
+
+  @@map("report_counters")
+}
+
+model Report {
+  id              String       @id @default(cuid())
+  reportNo        String       @unique @map("report_no")
+  reportYear      Int          @map("report_year")
+  reportSeq       Int          @map("report_seq")
+  /// Idempotency key sent by the browser; prevents duplicate reports on double-submit.
+  clientRequestId String?      @unique @map("client_request_id")
+  status          ReportStatus @default(DRAFT)
+
+  // Header
+  reportDate     DateTime @map("report_date") @db.Date
+  day            String
+  department     String   @default("NGS Laboratory")
+  preparedByName String   @map("prepared_by_name")
+  notes          String?
+
+  // 1. Sample summary
+  pendingSamples        Int?    @map("pending_samples")
+  newSamplesReceived    Int?    @map("new_samples_received")
+  samplesProcessedToday Int?    @map("samples_processed_today")
+  completedDispatched   Int?    @map("completed_dispatched")
+  totalUnderProcessing  Int?    @map("total_under_processing")
+  sampleQuality         String? @map("sample_quality")
+
+  // 3. Sample quality
+  sopCriteriaMet       Boolean? @map("sop_criteria_met")
+  samplesGoodCondition Boolean? @map("samples_good_condition")
+  conditionDetails     String?  @map("condition_details")
+  pickupByGvblStaff    Boolean? @map("pickup_by_gvbl_staff")
+  pickupBy             String?  @map("pickup_by")
+
+  // 4. Laboratory activities (activity keys, see src/lib/constants.ts)
+  activities    String[] @default([])
+  otherActivity String?  @map("other_activity")
+
+  // 7. Invoice update
+  invoiceStatus  InvoiceStatus? @map("invoice_status")
+  invoiceRemarks String?        @map("invoice_remarks")
+
+  // 8. Inventory / stock update
+  stockUpdated     Boolean @default(false) @map("stock_updated")
+  reagentsReceived Boolean @default(false) @map("reagents_received")
+  lowStockAlert    Boolean @default(false) @map("low_stock_alert")
+  inventoryRemarks String? @map("inventory_remarks")
+
+  // 9. Sequencing details
+  sequencingPlatform       String? @map("sequencing_platform")
+  runId                    String? @map("run_id")
+  flowCellId               String? @map("flow_cell_id")
+  samplesSentForSequencing String? @map("samples_sent_for_sequencing")
+
+  // 10–13
+  workSummary        String?       @map("work_summary")
+  issuesStatus       IssuesStatus? @map("issues_status")
+  issueDetails       String?       @map("issue_details")
+  pendingWork        String?       @map("pending_work")
+  additionalComments String?       @map("additional_comments")
+
+  // Prepared by (sign-off)
+  preparedSignature String?   @map("prepared_signature")
+  preparedAt        DateTime? @map("prepared_at")
+
+  // Verified by (sign-off)
+  verifiedByName    String?   @map("verified_by_name")
+  verifiedSignature String?   @map("verified_signature")
+  verifiedAt        DateTime? @map("verified_at")
+
+  /// Name of the person who first saved / last saved the report (no login — taken from "Prepared By")
+  createdByName String @map("created_by_name")
+  updatedByName String @map("updated_by_name")
+
+  // Soft delete — records are never physically removed from the application
+  deletedAt    DateTime? @map("deleted_at")
+  deletedByName String?  @map("deleted_by_name")
+  deleteReason String?   @map("delete_reason")
+
+  /// Demo/seed data flag — remove with `npm run db:remove-demo`
+  isDemo    Boolean  @default(false) @map("is_demo")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  samples     Sample[]
+  kits        KitReagentUsed[]
+  consumables ConsumableReceived[]
+
+  @@unique([reportYear, reportSeq])
+  @@index([reportDate])
+  @@index([status])
+  @@index([preparedByName])
+  @@index([deletedAt])
+  @@map("reports")
+}
+
+/// 2. Sample details
+model Sample {
+  id               String  @id @default(cuid())
+  reportId         String  @map("report_id")
+  report           Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  position         Int
+  sampleId         String  @map("sample_id")
+  projectInstitute String? @map("project_institute")
+  sampleType       String? @map("sample_type")
+  sampleTypeOther  String? @map("sample_type_other")
+  currentStatus    String? @map("current_status")
+  receivedFrom     String? @map("received_from")
+  sentTo           String? @map("sent_to")
+  coordinatedBy    String? @map("coordinated_by")
+  remarks          String?
+
+  @@index([reportId])
+  @@index([sampleId])
+  @@index([projectInstitute])
+  @@map("samples")
+}
+
+/// 5. Kits / reagents used
+model KitReagentUsed {
+  id           String  @id @default(cuid())
+  reportId     String  @map("report_id")
+  report       Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  position     Int
+  name         String
+  lotNo        String? @map("lot_no")
+  quantityUsed String? @map("quantity_used")
+
+  @@index([reportId])
+  @@map("kits_reagents_used")
+}
+
+/// 6. Consumables / reagents received
+model ConsumableReceived {
+  id                  String  @id @default(cuid())
+  reportId            String  @map("report_id")
+  report              Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  position            Int
+  itemName            String  @map("item_name")
+  batchLotCatalogueNo String? @map("batch_lot_catalogue_no")
+  invoiceDetails      String? @map("invoice_details")
+  supplier            String?
+
+  @@index([reportId])
+  @@map("consumables_received")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  reportNo   String?     @map("report_no")
+  /// Name of the person who performed the action, as entered in the form/dialog
+  actorName  String      @map("actor_name")
+  details    Json?
+  ipAddress  String?     @map("ip_address")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
